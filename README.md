@@ -2,9 +2,7 @@
 
 This NeurIPS 2025 Machine Learning competition explores uncertainty-aware and out-of-distribution detection AI techniques for Weak Gravitational Lensing Cosmology.
 
-## Modular Code Structure
-
-This repository has been refactored into a modular structure for better maintainability and reusability:
+## Project Structure
 
 ```
 cosmolens/
@@ -25,9 +23,10 @@ cosmolens/
 │   └── inference/       # Inference and prediction
 │       └── pipeline.py  # Improved prediction pipeline
 ├── models/              # Saved model checkpoints
+├── notebooks/           # Experimental Jupyter notebooks
 ├── main.py              # Main execution script
 ├── requirements.txt     # Python dependencies
-└── README.md           # This file
+└── README.md           
 ```
 
 ### Key Modules
@@ -50,7 +49,7 @@ python main.py
 
 ---
 
-# Original Competition Description
+# Competition Description
 
 ### Problem Statement
 
@@ -67,7 +66,7 @@ In addition to the cosmological signal, we also model various realistic systemat
 
 The figure below shows some examples of the training data and how they are varied with different nuisance parameters and pixel-level noise.
 
-![alt text](image.png)
+![alt text](/media/image.png)
 
 ### Evaluation
 
