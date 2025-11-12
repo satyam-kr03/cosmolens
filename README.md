@@ -1,5 +1,56 @@
 # FAIR Universe - Weak Lensing ML Uncertainty Challenge
+
 This NeurIPS 2025 Machine Learning competition explores uncertainty-aware and out-of-distribution detection AI techniques for Weak Gravitational Lensing Cosmology.
+
+## Modular Code Structure
+
+This repository has been refactored into a modular structure for better maintainability and reusability:
+
+```
+cosmolens/
+├── src/
+│   ├── utils/           # Utility classes and data handling
+│   │   ├── utility.py   # Utility functions
+│   │   ├── data.py      # Data loading and preprocessing
+│   │   └── score.py     # Scoring functions
+│   ├── models/          # Neural network architectures
+│   │   ├── resnet.py    # Multi-scale ResNet implementation
+│   │   └── ensemble.py  # XGBoost ensemble model
+│   ├── features/        # Feature extraction modules
+│   │   └── extractor.py # Hybrid CNN + statistical features
+│   ├── training/        # Training utilities
+│   │   ├── dataset.py   # PyTorch dataset classes
+│   │   ├── train.py     # Training and validation functions
+│   │   └── config.py    # Configuration parameters
+│   └── inference/       # Inference and prediction
+│       └── pipeline.py  # Improved prediction pipeline
+├── models/              # Saved model checkpoints
+├── main.py              # Main execution script
+├── requirements.txt     # Python dependencies
+└── README.md           # This file
+```
+
+### Key Modules
+
+- **`src.utils`**: Data loading, utility functions, and scoring
+- **`src.models`**: Neural network architectures (ResNet, Ensemble)
+- **`src.features`**: Feature extraction combining CNN and statistical features
+- **`src.training`**: Dataset classes, training loops, and configuration
+- **`src.inference`**: Advanced prediction pipeline with TTA and MCMC
+
+### Installation & Usage
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the main pipeline
+python main.py
+```
+
+---
+
+# Original Competition Description
 
 ### Problem Statement
 
