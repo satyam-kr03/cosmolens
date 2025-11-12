@@ -1,2 +1,99 @@
-# cosmolens
-NeurIPS 2025 Machine Learning competition - FAIR Universe - Weak Lensing ML Uncertainty Challenge
+# FAIR Universe - Weak Lensing ML Uncertainty Challenge
+This NeurIPS 2025 Machine Learning competition explores uncertainty-aware and out-of-distribution detection AI techniques for Weak Gravitational Lensing Cosmology.
+
+### Problem Statement
+
+The large-scale structure of the universe, revealed through weak gravitational lensing, encodes vital information about cosmic evolution and matter distribution. Traditional statistical tools capture only limited information, motivating the use of machine learning and higher-order methods to better analyze complex lensing patterns. This competition seeks to compare such approaches, assess their robustness to simulation biases, and improve the reliability of cosmological inference for future surveys.
+
+### Data
+
+Participants will work with simulated datasets mimicking observations from the Hyper Suprime-Cam (HSC) survey. Each data is a 2D image of dimension 1424×1761424×176, corresponds to the convergence map of redshift BIN 2 of WIDE12H subfield in HSC Y3, pixelized with a resolution of 2 arcmin.
+
+These weak lensing convergence maps are generated from high-resolution cosmological ray-tracing simulations with 101101 different spatially-flat ΛCDMΛCDM cosmological models. Each cosmological model differs in cosmological parameters ΩmΩm​, the fraction of the total matter density of the Universe, and S8S8​, the amplitude of matter fluctuations on 8 Mpc/h8Mpc/h scales in the Universe today. These two parameters serve as the label of each data.
+
+In addition to the cosmological signal, we also model various realistic systematic effects (distortions to the data), such as baryonic effect and photometric redshift uncertainty. These systematics are introduced in the data generation process, which we fully sampled in the training set so that the participants can marginalize over them. The parameters corresponding to these systematic models are nuisance parameters and need to be marginalized during inference.
+
+
+The figure below shows some examples of the training data and how they are varied with different nuisance parameters and pixel-level noise.
+
+![alt text](image.png)
+
+### Evaluation
+
+#### Phase 1: Cosmological Parameter Estimation
+
+Participants' models should determine the point estimates and their one-standard deviation uncertainties.
+
+The Phase 1 test data contains 4,000 instances (2D fields similar to images) drawn from the same distribution as the training data with unknown cosmological parameters and 4 systematics. 
+
+
+---
+
+# Approach: A Hybrid ResNet-XGBoost Ensemble 
+
+Here we outline a machine learning approach for estimating the cosmological parameters $\Omega_m$ (Omega matter) and $S_8$ from weak-lensing convergence maps (kappa maps). The solution employs a sophisticated stacked ensemble model that combines a Convolutional Neural Network (CNN) for feature extraction with an XGBoost model for regression, further refined by a neural network meta-learner. The final parameter uncertainties are derived using a Markov Chain Monte Carlo (MCMC) method informed by the model's predictions.
+
+## 1. Data Preprocessing and Augmentation
+
+1.  **Data Loading**: The training (`kappa`) and test (`kappa_test`) convergence maps are loaded as NumPy arrays. A binary mask is used to handle the specific geometry of the survey area.
+2.  **Train/Validation Split**: The full training dataset, which consists of 101 cosmologies with 256 systematic variations each, is split into training and validation sets (e.g., `noisy_kappa_train`, `noisy_kappa_val`). The labels ($\Omega_m$, $S_8$) are also loaded and similarly split.
+3.  **Normalization**: The labels (parameters) are standardized using `sklearn.preprocessing.StandardScaler` for training, and the image data is normalized (mean/std) via `torchvision.transforms` before being fed into the neural network.
+4.  **Data Augmentation**: To improve model robustness and prevent overfitting, the training dataset is augmented in real-time. The `AugmentedCosmologyDataset` class applies random augmentations during training, including:
+    * Horizontal flips (`np.fliplr`)
+    * Vertical flips (`np.flipud`)
+    * 180-degree rotations (`np.rot90`)
+    * Addition of small Gaussian noise.
+
+## 2. Model Architecture: A Stacked Ensemble
+
+The core of this approach is a `StackedEnsemble` model that combines the strengths of deep learning and gradient boosting in a two-level architecture.
+
+### Level 0: Feature Extractors and Base Learners
+
+1.  **CNN Feature Extractor (`MultiScaleResNet`)**:
+    * A custom ResNet-based architecture is used as the primary feature extractor.
+    * It begins with an initial convolutional layer and max pooling to reduce spatial dimensions.
+    * It then passes the data through four sequential `ResidualBlock` layers, progressively increasing the feature depth (64 -> 128 -> 256 -> 512) and downsampling the map.
+    * To capture information at multiple scales, the output of *each* of the four residual layers is passed through an `AdaptiveAvgPool2d` layer, flattened, and concatenated.
+    * This multi-scale feature vector is fed into a final fully connected (FC) block with Dropout and BatchNorm to produce a 256-dimensional feature vector.
+
+2.  **Statistical Feature Extractor**:
+    * A separate function, `compute_statistical_features`, calculates a set of 8 classical statistics for each map (mean, std, skew, kurtosis, 25th/75th percentiles, min, and max). These statistical features are standardized using `StandardScaler`.
+
+3.  **Hybrid Feature Extractor**:
+    * The 256 features from the `MultiScaleResNet` are combined with the 8 statistical features.
+    * Principal Component Analysis (`PCA`) is then applied to this combined feature vector for dimensionality reduction (e.g., to 128 components). This resulting vector serves as the "hybrid feature" input for the XGBoost models.
+
+4.  **Base Learners**:
+    * **XGBoost Models**: Two separate `xgboost.XGBRegressor` models are trained—one for $\Omega_m$ and one for $S_8$. Both are trained on the same *hybrid feature* vector.
+    * **CNN Prediction Head**: The original CNN (`MultiScaleResNetWithHead`) also has its own linear prediction head that produces direct estimates for $\Omega_m$ and $S_8$ from the 256-dimensional CNN feature vector.
+
+### Level 1: Meta-Learner (Stacking)
+
+The predictions from the base learners are used as features to train a final meta-learner:
+
+1.  **Feature Creation**: For the training set, predictions are gathered from:
+    * The CNN's prediction head (2 predictions: $\Omega_m, S_8$).
+    * The trained $\Omega_m$-XGBoost model (1 prediction).
+    * The trained $S_8$-XGBoost model (1 prediction).
+2.  **Meta-Model**: These 4 predictions are concatenated into a new feature vector. This vector is used to train a simple feed-forward neural network (Linear -> ReLU -> Dropout -> Linear) that outputs the final two parameter estimates.
+
+## 3. Training and Hyperparameter Optimization
+
+1.  **CNN Feature Extractor Training**: The `MultiScaleResNetWithHead` is trained first as a standalone model. It is trained for 15 epochs using `MSELoss`, an `AdamW` optimizer, and a `CosineAnnealingWarmRestarts` learning rate scheduler. Early stopping with a patience of 7 epochs is used to save the best model based on validation loss.
+2.  **Ensemble Training**: After the CNN is trained and its weights are frozen, the `StackedEnsemble` is fit. This involves (a) extracting all hybrid features for the training data, (b) training the two XGBoost models, and (c) training the meta-learner for 1000 epochs.
+3.  **Hyperparameter Optimization (Optuna)**: The `Optuna` library is used to perform a 5-trial optimization search for the best hyperparameters. This search tunes a wide array of parameters simultaneously, including the CNN's feature dimension and dropout, the optimizer's learning rate and weight decay, batch size, PCA components, and all key XGBoost parameters (e.g., `n_estimators`, `max_depth`, `learning_rate`, `subsample`, etc.). The objective is to minimize the final MSE on the validation set.
+
+## 4. Prediction and Uncertainty Estimation
+
+The final predictions for the competition require both a point estimate and an error bar.
+
+1.  **Test-Time Augmentation (TTA)**: For generating the final predictions, the `ImprovedPredictionPipeline` uses TTA. It generates 8 augmented versions (flips, rotations, etc.) of each test map, runs each through the full `StackedEnsemble`, and averages the 8 resulting predictions. This significantly improves the robustness and accuracy of the final estimate.
+2.  **MCMC for Uncertainty**: The model's point estimates are used to build a likelihood model for a Markov Chain Monte Carlo (MCMC) sampler.
+    * First, the mean prediction (`mean_d_vector`) and covariance matrix (`cov_d_vector`) of the ensemble's predictions are calculated for each of the 101 known cosmologies in the validation set.
+    * `LinearNDInterpolator` (and later, `RBFInterpolator` for improved smoothness) is used to create functions that can interpolate the mean and covariance for *any* given ($\Omega_m, S_8$) pair.
+    * These interpolators are used to define a log-likelihood function (`loglike`) that calculates the probability of the model's TTA prediction *given* a true set of parameters.
+    * For each of the 4000 test maps, 4 independent MCMC chains are run for 12,000 steps each to sample the posterior distribution, with an adaptive step size to optimize acceptance rates.
+    * The first 25% of samples from each chain are discarded as burn-in. The remaining samples from all chains are combined.
+    * The **mean** of this combined posterior distribution is used as the final point estimate ($\Omega_m$, $S_8$), and the **standard deviation** is used as the uncertainty (error bar).
+3.  **Error Calibration**: Finally, the error bars from the validation set MCMC are compared to the actual errors (predicted vs. true values) to compute a "calibration factor". This factor is used to scale the final test set error bars to ensure they are well-calibrated for the competition's scoring function.
