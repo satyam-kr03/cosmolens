@@ -1,4 +1,4 @@
-# FAIR Universe - Weak Lensing ML Uncertainty Challenge
+# FAIR Universe - [Weak Lensing ML Uncertainty Challenge](https://www.codabench.org/competitions/8934/)
 
 This NeurIPS 2025 Machine Learning competition explores uncertainty-aware and out-of-distribution detection AI techniques for Weak Gravitational Lensing Cosmology.
 
@@ -39,43 +39,15 @@ cosmolens/
 
 ### Installation & Usage
 
+Install dependencies
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Run the main pipeline
-python main.py
 ```
 
----
-
-# Competition Description
-
-### Problem Statement
-
-The large-scale structure of the universe, revealed through weak gravitational lensing, encodes vital information about cosmic evolution and matter distribution. Traditional statistical tools capture only limited information, motivating the use of machine learning and higher-order methods to better analyze complex lensing patterns. This competition seeks to compare such approaches, assess their robustness to simulation biases, and improve the reliability of cosmological inference for future surveys.
-
-### Data
-
-Participants will work with simulated datasets mimicking observations from the Hyper Suprime-Cam (HSC) survey. Each data is a 2D image of dimension 1424×1761424×176, corresponds to the convergence map of redshift BIN 2 of WIDE12H subfield in HSC Y3, pixelized with a resolution of 2 arcmin.
-
-These weak lensing convergence maps are generated from high-resolution cosmological ray-tracing simulations with 101101 different spatially-flat ΛCDMΛCDM cosmological models. Each cosmological model differs in cosmological parameters ΩmΩm​, the fraction of the total matter density of the Universe, and S8S8​, the amplitude of matter fluctuations on 8 Mpc/h8Mpc/h scales in the Universe today. These two parameters serve as the label of each data.
-
-In addition to the cosmological signal, we also model various realistic systematic effects (distortions to the data), such as baryonic effect and photometric redshift uncertainty. These systematics are introduced in the data generation process, which we fully sampled in the training set so that the participants can marginalize over them. The parameters corresponding to these systematic models are nuisance parameters and need to be marginalized during inference.
-
-
-The figure below shows some examples of the training data and how they are varied with different nuisance parameters and pixel-level noise.
-
-![alt text](/media/image.png)
-
-### Evaluation
-
-#### Phase 1: Cosmological Parameter Estimation
-
-Participants' models should determine the point estimates and their one-standard deviation uncertainties.
-
-The Phase 1 test data contains 4,000 instances (2D fields similar to images) drawn from the same distribution as the training data with unknown cosmological parameters and 4 systematics. 
-
+Run the main pipeline
+```bash
+python main.py
+```
 
 ---
 
