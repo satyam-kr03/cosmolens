@@ -3,3 +3,8 @@
 *.pkl
 *.npy
 *.zip
+.DS_Store
+/data/
+/models/
+/logs/
+__pycache__/
