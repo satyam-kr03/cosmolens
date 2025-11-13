@@ -1,1 +1,0 @@
-[I 2025-11-09 15:49:17,781] Trial 18 finished with value: 0.19396389122262145 and parameters: {'batch_size': 32, 'learning_rate': 0.0008644876850444703, 'weight_decay': 4.295472250504452e-05, 'dropout1': 0.2014025134269637, 'dropout2': 0.30782001739270354, 'epochs': 6}. Best is trial 18 with value: 0.19396389122262145.
