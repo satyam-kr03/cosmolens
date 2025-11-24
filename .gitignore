@@ -7,5 +7,5 @@
 /data/
 /models/
 /logs/
-*/__pycache__/
+/__pycache__/
 Cosmology_Challenge/
