@@ -80,7 +80,7 @@ class StackedEnsemble:
             loss.backward()
             optimizer.step()
             if (epoch + 1) % 20 == 0:
-                print(f"Meta-learner epoch {epoch+1}/100, Loss: {loss.item():.6f}")
+                print(f"Meta-learner epoch {epoch+1}/1000, Loss: {loss.item():.6f}")
 
         print("Ensemble training complete!")
 

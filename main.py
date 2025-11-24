@@ -20,7 +20,6 @@ from sklearn.metrics import mean_squared_error, r2_score
 import xgboost as xgb
 import optuna
 
-# Import our modular components
 from src.utils import Utility, Data, Score
 from src.models import MultiScaleResNetWithHead, StackedEnsemble
 from src.features import compute_statistical_features, HybridFeatureExtractor
@@ -104,10 +103,16 @@ def main():
 
 
     # Hyperparameter optimization with Optuna
-    USE_OPTUNA = False
-    N_TRIALS = 5
+    USE_OPTUNA = True
+    N_TRIALS = 30  # Increased for better exploration
+
+    n_epochs = 5
 
     if USE_OPTUNA:
+        # Set seed for reproducibility
+        torch.manual_seed(42)
+        np.random.seed(42)
+
         print("Starting Optuna hyperparameter optimization...")
 
         def objective(trial):
@@ -149,7 +154,7 @@ def main():
                                           weight_decay=weight_decay)
             scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=3, T_mult=1)
 
-            n_epochs = 5  # Reduced for faster optimization
+            n_epochs = 20  # Increased for better hyperparameter evaluation
             for epoch in range(n_epochs):
                 train_loss = train_epoch(trial_model, trial_train_loader, loss_fn, optimizer, config.DEVICE)
                 val_loss = validate_epoch(trial_model, trial_val_loader, loss_fn, config.DEVICE)
@@ -188,7 +193,6 @@ def main():
 
             return mse
 
-        # Create study with pruning
         study = optuna.create_study(
             direction='minimize',
             pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=3)
@@ -295,9 +299,9 @@ def main():
         print("Loaded pretrained ensemble")
 
     # Validation predictions and MCMC
-    print("Predicting on validation set...")
-    y_pred_val = ensemble.predict(val_loader)
-    y_pred_val = label_scaler.inverse_transform(y_pred_val)
+    print("Predicting on validation set with TTA...")
+    improved_pipeline = ImprovedPredictionPipeline(ensemble, config.DEVICE, label_scaler)
+    y_pred_val, y_pred_val_std = improved_pipeline.predict_with_tta(val_loader, n_augmentations=5)
 
     print(f"Predictions: {y_pred_val.shape}")
 
@@ -365,23 +369,20 @@ def main():
 
     print("Running MCMC on validation set...")
 
-    for i in tqdm(range(Nstep), desc="MCMC"):
-        proposal = current + np.random.randn(*current.shape) * sigma
-        proposal_logprob = logp_posterior(proposal, y_pred_val)
+    states_val = improved_pipeline.run_multiple_mcmc_chains(
+        y_pred_val,
+        cosmology,
+        mean_d_vector_interp,
+        cov_d_vector_interp,
+        logprior_interp,
+        n_chains=3,  # Notebook uses 3 chains for validation
+        n_steps=8000,  # Notebook uses 8000 steps
+        sigma=0.05,  # Notebook uses 0.05
+        burn_in=0.25  # Notebook uses 0.25
+    )
 
-        acc_logprob = proposal_logprob - curr_logprob
-        acc_logprob[acc_logprob > 0] = 0
-        acc_prob = np.exp(acc_logprob)
-        acc = np.random.uniform(size=len(current)) < acc_prob
-
-        total_acc += acc_prob
-        current[acc] = proposal[acc]
-        curr_logprob[acc] = proposal_logprob[acc]
-        states.append(np.copy(current)[None])
-
-    states = np.concatenate(states[int(0.2*Nstep):], 0)
-    mean_val = np.mean(states, 0)
-    errorbar_val = np.std(states, 0)
+    mean_val = np.mean(states_val, 0)
+    errorbar_val = np.std(states_val, 0)
 
     print(f"MCMC complete! Acceptance rate: {np.mean(total_acc/Nstep):.3f}")
     print(f"Mean error bars: {np.mean(errorbar_val, 0)}")
