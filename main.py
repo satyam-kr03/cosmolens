@@ -31,6 +31,9 @@ def main():
     """Main execution function"""
     print("Cosmology Parameter Estimation Pipeline")
     print("=" * 50)
+    
+    # Create plots directory
+    os.makedirs("plots", exist_ok=True)
 
     # Configuration
     root_dir = os.getcwd()
@@ -104,7 +107,7 @@ def main():
 
     # Hyperparameter optimization with Optuna
     USE_OPTUNA = True
-    N_TRIALS = 30  # Increased for better exploration
+    N_TRIALS = 1  # Increased for better exploration
 
     n_epochs = 5
 
@@ -199,6 +202,19 @@ def main():
         )
 
         study.optimize(objective, n_trials=N_TRIALS, show_progress_bar=True)
+        
+        # Plot optimization history
+        trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+        values = [t.value for t in trials]
+        plt.figure(figsize=(10, 5))
+        plt.plot(values, 'o-')
+        plt.xlabel('Trial')
+        plt.ylabel('MSE')
+        plt.title('Optuna Optimization History')
+        plt.grid(True)
+        plt.savefig('plots/optuna_history.png')
+        plt.close()
+        print("Optuna history plot saved to plots/optuna_history.png")
 
         print("\n" + "=" * 70)
         print("OPTUNA OPTIMIZATION COMPLETE")
@@ -254,11 +270,17 @@ def main():
         best_val_loss = float('inf')
         patience = 7
         patience_counter = 0
+        
+        train_losses = []
+        val_losses = []
 
         for epoch in range(config.EPOCHS):
             train_loss = train_epoch(cnn_model, train_loader, loss_fn, optimizer, config.DEVICE)
             val_loss = validate_epoch(cnn_model, val_loader, loss_fn, config.DEVICE)
             scheduler.step()
+            
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
 
             print(f"Epoch {epoch+1}/{config.EPOCHS} | Train: {train_loss:.6f} | Val: {val_loss:.6f}")
 
@@ -272,6 +294,19 @@ def main():
                 if patience_counter >= patience:
                     print(f"Early stopping at epoch {epoch+1}")
                     break
+        
+        # Plot training curves
+        plt.figure(figsize=(10, 5))
+        plt.plot(train_losses, label='Train Loss')
+        plt.plot(val_losses, label='Val Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss (MSE)')
+        plt.title('Training and Validation Loss')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig('plots/training_loss.png')
+        plt.close()
+        print("Training loss plot saved to plots/training_loss.png")
 
         cnn_model.load_state_dict(torch.load(config.CNN_MODEL_PATH, weights_only=True))
         print("CNN training complete!")
@@ -304,6 +339,36 @@ def main():
     y_pred_val, y_pred_val_std = improved_pipeline.predict_with_tta(val_loader, n_augmentations=5)
 
     print(f"Predictions: {y_pred_val.shape}")
+    
+    # Plot predictions vs true values
+    plt.figure(figsize=(12, 5))
+    
+    # Omega_m
+    plt.subplot(1, 2, 1)
+    plt.scatter(y_val[:, 0], y_pred_val[:, 0], alpha=0.5, s=10)
+    min_val = min(y_val[:, 0].min(), y_pred_val[:, 0].min())
+    max_val = max(y_val[:, 0].max(), y_pred_val[:, 0].max())
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--')
+    plt.xlabel(r'True $\Omega_m$')
+    plt.ylabel(r'Predicted $\Omega_m$')
+    plt.title(r'$\Omega_m$ Predictions')
+    plt.grid(True)
+
+    # Sigma_8
+    plt.subplot(1, 2, 2)
+    plt.scatter(y_val[:, 1], y_pred_val[:, 1], alpha=0.5, s=10)
+    min_val = min(y_val[:, 1].min(), y_pred_val[:, 1].min())
+    max_val = max(y_val[:, 1].max(), y_pred_val[:, 1].max())
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--')
+    plt.xlabel(r'True $\sigma_8$')
+    plt.ylabel(r'Predicted $\sigma_8$')
+    plt.title(r'$\sigma_8$ Predictions')
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig('plots/validation_predictions.png')
+    plt.close()
+    print("Validation prediction plots saved to plots/validation_predictions.png")
 
     # MCMC setup
     cosmology = data_obj.label[:,0,:2]
@@ -384,8 +449,38 @@ def main():
     mean_val = np.mean(states_val, 0)
     errorbar_val = np.std(states_val, 0)
 
-    print(f"MCMC complete! Acceptance rate: {np.mean(total_acc/Nstep):.3f}")
+    # print(f"MCMC complete! Acceptance rate: {np.mean(total_acc/Nstep):.3f}") # total_acc is not updated here
     print(f"Mean error bars: {np.mean(errorbar_val, 0)}")
+    
+    # Plot predictions with error bars
+    plt.figure(figsize=(12, 5))
+    
+    # Omega_m
+    plt.subplot(1, 2, 1)
+    plt.errorbar(y_val[:, 0], mean_val[:, 0], yerr=errorbar_val[:, 0], fmt='o', alpha=0.5, markersize=3, ecolor='gray')
+    min_val = min(y_val[:, 0].min(), mean_val[:, 0].min())
+    max_val = max(y_val[:, 0].max(), mean_val[:, 0].max())
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--')
+    plt.xlabel(r'True $\Omega_m$')
+    plt.ylabel(r'Predicted $\Omega_m$')
+    plt.title(r'$\Omega_m$ Predictions with MCMC Uncertainties')
+    plt.grid(True)
+
+    # Sigma_8
+    plt.subplot(1, 2, 2)
+    plt.errorbar(y_val[:, 1], mean_val[:, 1], yerr=errorbar_val[:, 1], fmt='o', alpha=0.5, markersize=3, ecolor='gray')
+    min_val = min(y_val[:, 1].min(), mean_val[:, 1].min())
+    max_val = max(y_val[:, 1].max(), mean_val[:, 1].max())
+    plt.plot([min_val, max_val], [min_val, max_val], 'r--')
+    plt.xlabel(r'True $\sigma_8$')
+    plt.ylabel(r'Predicted $\sigma_8$')
+    plt.title(r'$\sigma_8$ Predictions with MCMC Uncertainties')
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig('plots/validation_mcmc_predictions.png')
+    plt.close()
+    print("Validation MCMC prediction plots saved to plots/validation_mcmc_predictions.png")
 
     # Validation score
     validation_score = Score._score_phase1(y_val, mean_val, errorbar_val)
