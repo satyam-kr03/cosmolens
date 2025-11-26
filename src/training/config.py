@@ -6,12 +6,12 @@ class Config:
     NUM_TARGETS = 2
     FEATURE_DIM = 256
     DROPOUT = 0.35
-    BATCH_SIZE = 32
+    BATCH_SIZE = 64
     EPOCHS = 15
-    LEARNING_RATE = 5e-4
+    LEARNING_RATE = 1e-4
     WEIGHT_DECAY = 1e-4
     PCA_COMPONENTS = 128
-
+    
     XGB_PARAMS = {
         'n_estimators': 300,
         'max_depth': 10,

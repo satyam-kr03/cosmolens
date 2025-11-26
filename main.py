@@ -106,7 +106,7 @@ def main():
 
 
     # Hyperparameter optimization with Optuna
-    USE_OPTUNA = True
+    USE_OPTUNA = False
     N_TRIALS = 1  # Increased for better exploration
 
     n_epochs = 5
@@ -122,8 +122,8 @@ def main():
             # Suggest hyperparameters
             feature_dim = trial.suggest_categorical('feature_dim', [128, 256, 512])
             dropout = trial.suggest_float('dropout', 0.2, 0.5)
-            learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-3, log=True)
-            batch_size = trial.suggest_categorical('batch_size', [16, 32, 64])
+            learning_rate = trial.suggest_float('learning_rate', 1e-5, 5e-4, log=True)
+            batch_size = trial.suggest_categorical('batch_size', [32, 64, 128])
             weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-3, log=True)
 
             # XGBoost params
@@ -289,11 +289,11 @@ def main():
                 patience_counter = 0
                 torch.save(cnn_model.state_dict(), config.CNN_MODEL_PATH)
                 print("  ✓ Best model saved!")
-            else:
-                patience_counter += 1
-                if patience_counter >= patience:
-                    print(f"Early stopping at epoch {epoch+1}")
-                    break
+            # else:
+            #     patience_counter += 1
+            #     if patience_counter >= patience:
+            #         print(f"Early stopping at epoch {epoch+1}")
+            #         break
         
         # Plot training curves
         plt.figure(figsize=(10, 5))
@@ -490,7 +490,7 @@ def main():
 
     # Test predictions with improved pipeline
     print("=" * 70)
-    print("GENERATING IMPROVED TEST PREDICTIONS")
+    print("GENERATING TEST PREDICTIONS")
     print("=" * 70)
 
     # Initialize improved pipeline
@@ -540,15 +540,13 @@ def main():
     )
 
     print("\n" + "=" * 70)
-    print("IMPROVED SUBMISSION CREATED")
+    print("SUBMISSION CREATED")
     print("=" * 70)
     print(f"File: {zip_file}")
     print(f"Test samples: {len(mean_test_improved)}")
     print("Improvements applied:")
-    print("  ✓ Test-Time Augmentation (8 augmentations)")
-    print("  ✓ Multiple MCMC chains (4 chains, 12000 steps)")
-    print("  ✓ Adaptive step size")
-    print("  ✓ Calibrated error bars")
+    print("Test-Time Augmentation (8 augmentations)")
+    print("Multiple MCMC chains (4 chains, 12000 steps)")
     print("=" * 70)
 
     print("Pipeline setup complete!")
